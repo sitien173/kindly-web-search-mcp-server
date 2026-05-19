@@ -21,7 +21,7 @@ COPY pyproject.toml README.md /app/
 COPY src /app/src
 
 RUN python -m pip install --upgrade pip \
-    && python -m pip install .
+    && python -m pip install ".[compress]"
 
 # Run as non-root for better container security.
 RUN useradd -m -u 10001 app \
