@@ -1,6 +1,8 @@
 services:
   lightpanda:
+    profiles: ["lightpanda"]
     image: lightpanda/browser:nightly
+    platform: linux/amd64  # lightpanda has no arm64 image; use --profile lightpanda on amd64 hosts only
     command: ["serve", "--host", "0.0.0.0", "--port", "9222"]
     ports:
       - "127.0.0.1:9222:9222"
@@ -13,11 +15,8 @@ services:
 
   kindly-server:
     build: .
-    depends_on:
-      lightpanda:
-        condition: service_healthy
     environment:
-      KINDLY_BROWSER_ENGINE: lightpanda
+      KINDLY_BROWSER_ENGINE: ${KINDLY_BROWSER_ENGINE:-chromium}
       KINDLY_LIGHTPANDA_HOST: lightpanda
       KINDLY_LIGHTPANDA_PORT: "9222"
     env_file:
