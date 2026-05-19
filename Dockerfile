@@ -30,4 +30,4 @@ USER app
 
 # Default to stdio (for `docker run -i ...`). Override with `--http` for HTTP mode.
 ENTRYPOINT ["mcp-web-search"]
-CMD ["--stdio"]
+CMD ["--http"]
