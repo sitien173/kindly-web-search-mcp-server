@@ -12,7 +12,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from .chromium_pool import get_chromium_pool, reuse_enabled
+from ..settings import settings
+from .chromium_pool import (
+    ChromiumSlot,
+    LightPandaSlot,
+    get_browser_pool,
+    get_chromium_pool,
+    reuse_enabled,
+)
 from .extract import extract_content_as_markdown
 from .sanitize import sanitize_markdown
 from ..utils.diagnostics import (
@@ -556,10 +563,14 @@ async def fetch_html_via_nodriver(
 
     pool = None
     slot = None
-    use_pool = reuse_enabled()
+    browser_engine = (settings.browser_engine or "chromium").strip().lower()
+    use_pool = True if browser_engine == "lightpanda" else reuse_enabled()
     if use_pool:
         try:
-            pool = await get_chromium_pool(diagnostics=diagnostics)
+            if browser_engine == "lightpanda":
+                pool = await get_browser_pool(diagnostics=diagnostics)
+            else:
+                pool = await get_chromium_pool(diagnostics=diagnostics)
             slot = await pool.acquire(user_agent=config.user_agent, diagnostics=diagnostics)
         except Exception as exc:
             if diagnostics:
@@ -571,7 +582,11 @@ async def fetch_html_via_nodriver(
             slot = None
     if slot is None:
         use_pool = False
-    def _compose_cmd(active_slot: ChromiumSlot | None) -> list[str]:
+    browser_executable_path = (
+        None if browser_engine == "lightpanda" else _resolve_browser_executable_path()
+    )
+
+    def _compose_cmd(active_slot: ChromiumSlot | LightPandaSlot | None) -> list[str]:
         cmd = list(base_cmd)
         if active_slot is not None:
             cmd.extend(
@@ -583,13 +598,12 @@ async def fetch_html_via_nodriver(
                     "--reuse-browser",
                 ]
             )
-            if active_slot.user_data_dir is not None:
+            if hasattr(active_slot, "user_data_dir") and active_slot.user_data_dir is not None:
                 cmd.extend(["--user-data-dir", active_slot.user_data_dir.name])
         if browser_executable_path:
             cmd.extend(["--browser-executable-path", browser_executable_path])
         return cmd
 
-    browser_executable_path = _resolve_browser_executable_path()
     cmd = _compose_cmd(slot)
 
     env = _maybe_add_src_to_pythonpath(dict(os.environ))

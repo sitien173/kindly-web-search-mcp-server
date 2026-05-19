@@ -1,0 +1,3 @@
+# Stellaris Code Search configuration
+# Set auto_index=true to enable automatic incremental indexing on startup
+auto_index=true

@@ -1,0 +1,46 @@
+{
+  "deny": [
+    {
+      "name": "models-no-runtime-deps",
+      "from": "src/kindly_web_search_mcp_server/models.py",
+      "to": "src/kindly_web_search_mcp_server/search/**",
+      "reason": "Models/types stay pure — no search engine dependencies"
+    },
+    {
+      "name": "models-no-scrape-deps",
+      "from": "src/kindly_web_search_mcp_server/models.py",
+      "to": "src/kindly_web_search_mcp_server/scrape/**",
+      "reason": "Models/types stay pure — no scraping dependencies"
+    },
+    {
+      "name": "models-no-content-deps",
+      "from": "src/kindly_web_search_mcp_server/models.py",
+      "to": "src/kindly_web_search_mcp_server/content/**",
+      "reason": "Models/types stay pure — no content resolver dependencies"
+    },
+    {
+      "name": "search-no-scrape",
+      "from": "src/kindly_web_search_mcp_server/search/**",
+      "to": "src/kindly_web_search_mcp_server/scrape/**",
+      "reason": "Search engines return results — scraping is a separate layer handled by server/content"
+    },
+    {
+      "name": "utils-no-business-logic",
+      "from": "src/kindly_web_search_mcp_server/utils/**",
+      "to": "src/kindly_web_search_mcp_server/search/**",
+      "reason": "Utils are leaf nodes — no reverse deps into business logic"
+    },
+    {
+      "name": "utils-no-content",
+      "from": "src/kindly_web_search_mcp_server/utils/**",
+      "to": "src/kindly_web_search_mcp_server/content/**",
+      "reason": "Utils are leaf nodes — no reverse deps into content resolvers"
+    },
+    {
+      "name": "utils-no-scrape",
+      "from": "src/kindly_web_search_mcp_server/utils/**",
+      "to": "src/kindly_web_search_mcp_server/scrape/**",
+      "reason": "Utils are leaf nodes — no reverse deps into scraping"
+    }
+  ]
+}

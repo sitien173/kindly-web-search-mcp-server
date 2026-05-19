@@ -1,0 +1,18 @@
+{
+  "include": [
+    "src/**",
+    "tests/**",
+    "examples/**"
+  ],
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "__pycache__/**",
+    "**/*.pyc",
+    ".git/**",
+    "*.egg-info/**",
+    ".venv/**",
+    "venv/**"
+  ],
+  "chunkStrategy": "ast"
+}

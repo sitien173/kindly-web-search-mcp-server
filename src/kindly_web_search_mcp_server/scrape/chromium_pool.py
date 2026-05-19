@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Iterable
 
+from ..settings import settings
 from ..utils.diagnostics import Diagnostics
 from . import nodriver_worker as worker
 
@@ -126,109 +127,43 @@ class ChromiumSlot:
     browser_executable_path: str | None = None
     last_started: float | None = None
 
-    async def ensure_started(
-        self,
-        *,
-        user_agent: str,
-        port_range: tuple[int, int] | None,
-        diagnostics: Diagnostics | None,
-    ) -> None:
+    async def ensure_started(self, *, user_agent: str, port_range: tuple[int, int] | None, diagnostics: Diagnostics | None) -> None:
         if self.proc is not None and self.proc.returncode is None:
             if self.port is None:
                 if diagnostics:
-                    diagnostics.emit(
-                        "pool.slot_probe_failed",
-                        "Pooled Chromium missing port",
-                        {"slot_id": self.slot_id},
-                    )
+                    diagnostics.emit("pool.slot_probe_failed", "Pooled Chromium missing port", {"slot_id": self.slot_id})
                 await self.terminate()
             else:
                 try:
-                    await worker._wait_for_devtools_ready(
-                        host=self.host,
-                        port=self.port,
-                        proc=self.proc,
-                        timeout_seconds=POOL_HEALTH_TIMEOUT_SECONDS,
-                    )
+                    await worker._wait_for_devtools_ready(host=self.host, port=self.port, proc=self.proc, timeout_seconds=POOL_HEALTH_TIMEOUT_SECONDS)
                     if diagnostics:
-                        diagnostics.emit(
-                            "pool.slot_probe",
-                            "Pooled Chromium health check ok",
-                            {"slot_id": self.slot_id, "port": self.port},
-                        )
+                        diagnostics.emit("pool.slot_probe", "Pooled Chromium health check ok", {"slot_id": self.slot_id, "port": self.port})
                     return
                 except Exception as exc:
                     if diagnostics:
-                        diagnostics.emit(
-                            "pool.slot_probe_failed",
-                            "Pooled Chromium health check failed",
-                            {
-                                "slot_id": self.slot_id,
-                                "port": self.port,
-                                "error": type(exc).__name__,
-                            },
-                        )
+                        diagnostics.emit("pool.slot_probe_failed", "Pooled Chromium health check failed", {"slot_id": self.slot_id, "port": self.port, "error": type(exc).__name__})
                     await self.terminate()
         await self._start(user_agent=user_agent, port_range=port_range, diagnostics=diagnostics)
 
-    async def _start(
-        self,
-        *,
-        user_agent: str,
-        port_range: tuple[int, int] | None,
-        diagnostics: Diagnostics | None,
-    ) -> None:
+    async def _start(self, *, user_agent: str, port_range: tuple[int, int] | None, diagnostics: Diagnostics | None) -> None:
         self.browser_executable_path = _resolve_browser_executable_path()
         if not self.browser_executable_path:
-            raise RuntimeError(
-                "No Chromium-based browser executable found. "
-                "Install Chromium/Chrome or set KINDLY_BROWSER_EXECUTABLE_PATH."
-            )
+            raise RuntimeError("No Chromium-based browser executable found. Install Chromium/Chrome or set KINDLY_BROWSER_EXECUTABLE_PATH.")
         sandbox_enabled = worker._resolve_sandbox_enabled()
         devtools_ready_timeout_seconds = worker._resolve_devtools_ready_timeout_seconds()
-        is_snap = worker._is_snap_browser(self.browser_executable_path)
-        if is_snap:
+        if worker._is_snap_browser(self.browser_executable_path):
             devtools_ready_timeout_seconds *= worker._resolve_snap_backoff_multiplier()
-
         if self.user_data_dir is None:
-            self.user_data_dir = tempfile.TemporaryDirectory(
-                prefix="kindly-nodriver-pool-", ignore_cleanup_errors=True
-            )
+            self.user_data_dir = tempfile.TemporaryDirectory(prefix="kindly-nodriver-pool-", ignore_cleanup_errors=True)
         self.port = _pick_port(self.host, port_range)
-
-        args = worker._build_chromium_launch_args(
-            base_browser_args=_base_browser_args(user_agent, sandbox_enabled),
-            user_data_dir=self.user_data_dir.name,
-            user_agent=user_agent,
-            host=self.host,
-            port=self.port,
-            sandbox_enabled=sandbox_enabled,
-        )
+        args = worker._build_chromium_launch_args(base_browser_args=_base_browser_args(user_agent, sandbox_enabled), user_data_dir=self.user_data_dir.name, user_agent=user_agent, host=self.host, port=self.port, sandbox_enabled=sandbox_enabled)
         if diagnostics:
-            diagnostics.emit(
-                "pool.slot_start",
-                "Starting pooled Chromium",
-                {
-                    "slot_id": self.slot_id,
-                    "host": self.host,
-                    "port": self.port,
-                    "user_data_dir": self.user_data_dir.name,
-                },
-            )
+            diagnostics.emit("pool.slot_start", "Starting pooled Chromium", {"slot_id": self.slot_id, "host": self.host, "port": self.port, "user_data_dir": self.user_data_dir.name})
         self.proc = await worker._launch_chromium(self.browser_executable_path, args)
-        await worker._wait_for_devtools_ready(
-            host=self.host,
-            port=self.port,
-            proc=self.proc,
-            timeout_seconds=devtools_ready_timeout_seconds,
-        )
+        await worker._wait_for_devtools_ready(host=self.host, port=self.port, proc=self.proc, timeout_seconds=devtools_ready_timeout_seconds)
         self.last_started = time.monotonic()
         if diagnostics:
-            diagnostics.emit(
-                "pool.slot_ready",
-                "Pooled Chromium ready",
-                {"slot_id": self.slot_id, "host": self.host, "port": self.port},
-            )
+            diagnostics.emit("pool.slot_ready", "Pooled Chromium ready", {"slot_id": self.slot_id, "host": self.host, "port": self.port})
 
     async def terminate(self) -> None:
         if self.proc is not None:
@@ -258,6 +193,26 @@ class ChromiumSlot:
 
 
 @dataclass
+class LightPandaSlot:
+    slot_id: int
+    host: str
+    port: int
+
+    async def ensure_started(self, *, user_agent: str, port_range: tuple[int, int] | None, diagnostics: Diagnostics | None) -> None:
+        _ = user_agent
+        _ = port_range
+        await worker._wait_for_devtools_ready(host=self.host, port=self.port, proc=None, timeout_seconds=POOL_HEALTH_TIMEOUT_SECONDS)
+        if diagnostics:
+            diagnostics.emit("pool.slot_probe", "LightPanda health check ok", {"slot_id": self.slot_id, "host": self.host, "port": self.port})
+
+    async def terminate(self) -> None:
+        return None
+
+    def terminate_sync(self) -> None:
+        return None
+
+
+@dataclass
 class ChromiumPool:
     size: int
     acquire_timeout_seconds: float
@@ -271,53 +226,29 @@ class ChromiumPool:
             self.slots.append(slot)
             self.queue.put_nowait(slot)
 
-    async def acquire(
-        self, *, user_agent: str, diagnostics: Diagnostics | None
-    ) -> ChromiumSlot | None:
+    async def acquire(self, *, user_agent: str, diagnostics: Diagnostics | None) -> ChromiumSlot | None:
         try:
-            slot = await asyncio.wait_for(
-                self.queue.get(), timeout=self.acquire_timeout_seconds
-            )
+            slot = await asyncio.wait_for(self.queue.get(), timeout=self.acquire_timeout_seconds)
         except asyncio.TimeoutError:
             if diagnostics:
-                diagnostics.emit(
-                    "pool.acquire_timeout",
-                    "Timed out waiting for pooled Chromium",
-                    {"timeout_seconds": self.acquire_timeout_seconds},
-                )
+                diagnostics.emit("pool.acquire_timeout", "Timed out waiting for pooled Chromium", {"timeout_seconds": self.acquire_timeout_seconds})
             return None
-
         try:
-            await slot.ensure_started(
-                user_agent=user_agent, port_range=self.port_range, diagnostics=diagnostics
-            )
+            await slot.ensure_started(user_agent=user_agent, port_range=self.port_range, diagnostics=diagnostics)
         except Exception as exc:
             if diagnostics:
-                diagnostics.emit(
-                    "pool.slot_error",
-                    "Failed to start pooled Chromium",
-                    {"slot_id": slot.slot_id, "error": type(exc).__name__},
-                )
+                diagnostics.emit("pool.slot_error", "Failed to start pooled Chromium", {"slot_id": slot.slot_id, "error": type(exc).__name__})
             with contextlib.suppress(Exception):
                 await slot.terminate()
             await self.release(slot, diagnostics=diagnostics)
             return None
-
         if diagnostics:
-            diagnostics.emit(
-                "pool.acquire",
-                "Acquired pooled Chromium slot",
-                {"slot_id": slot.slot_id, "host": slot.host, "port": slot.port},
-            )
+            diagnostics.emit("pool.acquire", "Acquired pooled Chromium slot", {"slot_id": slot.slot_id, "host": slot.host, "port": slot.port})
         return slot
 
     async def release(self, slot: ChromiumSlot, *, diagnostics: Diagnostics | None) -> None:
         if diagnostics:
-            diagnostics.emit(
-                "pool.release",
-                "Released pooled Chromium slot",
-                {"slot_id": slot.slot_id, "host": slot.host, "port": slot.port},
-            )
+            diagnostics.emit("pool.release", "Released pooled Chromium slot", {"slot_id": slot.slot_id, "host": slot.host, "port": slot.port})
         await self.queue.put(slot)
 
     async def shutdown(self) -> None:
@@ -329,8 +260,52 @@ class ChromiumPool:
             slot.terminate_sync()
 
 
+@dataclass
+class LightPandaPool:
+    acquire_timeout_seconds: float
+    host: str
+    port: int
+    slot: LightPandaSlot = field(init=False)
+    queue: asyncio.Queue[LightPandaSlot] = field(default_factory=asyncio.Queue)
+
+    def __post_init__(self) -> None:
+        self.slot = LightPandaSlot(slot_id=0, host=self.host, port=self.port)
+        self.queue.put_nowait(self.slot)
+
+    async def acquire(self, *, user_agent: str, diagnostics: Diagnostics | None) -> LightPandaSlot | None:
+        try:
+            slot = await asyncio.wait_for(self.queue.get(), timeout=self.acquire_timeout_seconds)
+        except asyncio.TimeoutError:
+            if diagnostics:
+                diagnostics.emit("pool.acquire_timeout", "Timed out waiting for LightPanda slot", {"timeout_seconds": self.acquire_timeout_seconds})
+            return None
+        try:
+            await slot.ensure_started(user_agent=user_agent, port_range=None, diagnostics=diagnostics)
+        except Exception as exc:
+            if diagnostics:
+                diagnostics.emit("pool.slot_error", "Failed LightPanda health check", {"slot_id": slot.slot_id, "error": type(exc).__name__})
+            await self.release(slot, diagnostics=diagnostics)
+            return None
+        if diagnostics:
+            diagnostics.emit("pool.acquire", "Acquired LightPanda slot", {"slot_id": slot.slot_id, "host": slot.host, "port": slot.port})
+        return slot
+
+    async def release(self, slot: LightPandaSlot, *, diagnostics: Diagnostics | None) -> None:
+        if diagnostics:
+            diagnostics.emit("pool.release", "Released LightPanda slot", {"slot_id": slot.slot_id, "host": slot.host, "port": slot.port})
+        await self.queue.put(slot)
+
+    async def shutdown(self) -> None:
+        await self.slot.terminate()
+
+    def shutdown_sync(self) -> None:
+        self.slot.terminate_sync()
+
+
 _POOL: ChromiumPool | None = None
+_LIGHTPANDA_POOL: LightPandaPool | None = None
 _POOL_LOCK = asyncio.Lock()
+_LIGHTPANDA_POOL_LOCK = asyncio.Lock()
 _SHUTDOWN_REGISTERED = False
 
 
@@ -340,26 +315,40 @@ async def get_chromium_pool(diagnostics: Diagnostics | None = None) -> ChromiumP
         return _POOL
     async with _POOL_LOCK:
         if _POOL is None:
-            _POOL = ChromiumPool(
-                size=_resolve_pool_size(),
-                acquire_timeout_seconds=_resolve_acquire_timeout_seconds(),
-                port_range=_resolve_port_range(),
-            )
+            _POOL = ChromiumPool(size=_resolve_pool_size(), acquire_timeout_seconds=_resolve_acquire_timeout_seconds(), port_range=_resolve_port_range())
             if diagnostics:
-                diagnostics.emit(
-                    "pool.init",
-                    "Initialized Chromium pool",
-                    {"size": _POOL.size, "port_range": _POOL.port_range},
-                )
+                diagnostics.emit("pool.init", "Initialized Chromium pool", {"size": _POOL.size, "port_range": _POOL.port_range})
             _register_shutdown(_POOL)
     return _POOL
+
+
+async def get_lightpanda_pool(diagnostics: Diagnostics | None = None) -> LightPandaPool:
+    global _LIGHTPANDA_POOL
+    if _LIGHTPANDA_POOL is not None:
+        return _LIGHTPANDA_POOL
+    async with _LIGHTPANDA_POOL_LOCK:
+        if _LIGHTPANDA_POOL is None:
+            _LIGHTPANDA_POOL = LightPandaPool(acquire_timeout_seconds=_resolve_acquire_timeout_seconds(), host=settings.lightpanda_host, port=settings.lightpanda_port)
+            if diagnostics:
+                diagnostics.emit("pool.init", "Initialized LightPanda pool", {"host": _LIGHTPANDA_POOL.host, "port": _LIGHTPANDA_POOL.port})
+            _register_shutdown(_LIGHTPANDA_POOL)
+    return _LIGHTPANDA_POOL
+
+
+async def get_browser_pool(diagnostics: Diagnostics | None = None) -> ChromiumPool | LightPandaPool:
+    engine = (settings.browser_engine or "chromium").strip().lower()
+    if engine == "chromium":
+        return await get_chromium_pool(diagnostics=diagnostics)
+    if engine == "lightpanda":
+        return await get_lightpanda_pool(diagnostics=diagnostics)
+    raise RuntimeError(f"Unknown KINDLY_BROWSER_ENGINE={settings.browser_engine!r}; expected 'chromium' or 'lightpanda'")
 
 
 def reuse_enabled() -> bool:
     return _resolve_reuse_enabled()
 
 
-def _register_shutdown(pool: ChromiumPool) -> None:
+def _register_shutdown(pool: ChromiumPool | LightPandaPool) -> None:
     global _SHUTDOWN_REGISTERED
     if _SHUTDOWN_REGISTERED:
         return

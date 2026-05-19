@@ -521,7 +521,9 @@ async def _launch_chromium(
     )
 
 
-async def _terminate_process(proc: asyncio.subprocess.Process, *, grace_seconds: float = 1.5) -> None:
+async def _terminate_process(proc: asyncio.subprocess.Process | None, *, grace_seconds: float = 1.5) -> None:
+    if proc is None:
+        return
     try:
         if proc.returncode is not None:
             return
@@ -558,7 +560,7 @@ async def _wait_for_devtools_ready(
     *,
     host: str,
     port: int,
-    proc: asyncio.subprocess.Process,
+    proc: asyncio.subprocess.Process | None,
     timeout_seconds: float,
 ) -> None:
     """
@@ -580,7 +582,7 @@ async def _wait_for_devtools_ready(
     # for 127.0.0.1 can cause the readiness probe to hang or fail.
     async with httpx.AsyncClient(trust_env=False) as client:
         while time.monotonic() < deadline:
-            if proc.returncode is not None:
+            if proc is not None and proc.returncode is not None:
                 raise RuntimeError(f"Chromium exited early (code={proc.returncode})")
             try:
                 resp = await client.get(url, timeout=0.75)
