@@ -18,8 +18,24 @@ _enabled: bool = os.environ.get("KINDLY_COMPRESS_OUTPUT", "").strip().lower() in
     "yes",
 )
 
+_backend: str | None = os.environ.get("KINDLY_COMPRESS_BACKEND", "").strip().lower() or None
+_model: str | None = os.environ.get("KINDLY_COMPRESS_MODEL", "").strip() or None
+_base_url: str | None = os.environ.get("KINDLY_COMPRESS_BASE_URL", "").strip() or None
+
 _warned_missing = False
 _logged_backend = False
+
+
+def _build_kwargs() -> dict:
+    kwargs: dict = {}
+    if _backend:
+        kwargs["backend"] = _backend
+    if _model:
+        kwargs["model"] = _model
+    if _base_url:
+        kwargs["base_url"] = _base_url
+        kwargs["calculate_embeddings"] = False
+    return kwargs
 
 
 def maybe_compress(text: str) -> str:
@@ -38,7 +54,7 @@ def maybe_compress(text: str) -> str:
             _warned_missing = True
         return text
 
-    result = _cc_compress(text)
+    result = _cc_compress(text, **_build_kwargs())
 
     if isinstance(result, tuple):
         compressed = result[0]
@@ -46,7 +62,10 @@ def maybe_compress(text: str) -> str:
         compressed = result
 
     if not _logged_backend:
-        logger.info("Caveman compression active (auto-detected backend)")
+        backend_label = _backend or "auto-detected"
+        model_label = f", model={_model}" if _model else ""
+        url_label = f", base_url={_base_url}" if _base_url else ""
+        logger.info("Caveman compression active (backend=%s%s%s)", backend_label, model_label, url_label)
         _logged_backend = True
 
     return compressed
