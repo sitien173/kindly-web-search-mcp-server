@@ -11,6 +11,6 @@ services:
       - "host.docker.internal:host-gateway"
     env_file:
       - .env
-    stdin_open: false
+    stdin_open: true
     entrypoint: ["mcp-web-search"]
-    command: ["--http"]
+    command: ["--http", "--mount-path", "/"]
