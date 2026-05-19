@@ -21,6 +21,7 @@ from .utils.diagnostics import (
     new_request_id,
     sample_data,
 )
+from .utils.compression import maybe_compress
 from .utils.logging import configure_logging
 
 configure_logging()
@@ -404,7 +405,7 @@ async def web_search(
                 )
             return r.model_copy(
                 update={
-                    "page_content": page_md,
+                    "page_content": maybe_compress(page_md),
                     "diagnostics": result_diag.entries if result_diag else None,
                 }
             )
@@ -505,6 +506,6 @@ async def get_content(url: str) -> dict:
 
     return GetContentResponse(
         url=url,
-        page_content=page_md,
+        page_content=maybe_compress(page_md),
         diagnostics=diag.entries if diag_enabled else None,
     ).model_dump(exclude_none=True)

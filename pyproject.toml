@@ -25,6 +25,7 @@ dev = ["pytest", "ruff"]
 # These pull in `onnxruntime` transitively (via `pymupdf-layout`), which may not have wheels
 # for the newest CPython releases (e.g., cp314). Keeping them optional avoids install
 # failures while preserving a simple text-extraction baseline via PyMuPDF.
+compress = ["caveman-compression"]
 pdf-advanced = [
     "pymupdf-layout>=1.26.6; python_version < '3.14'",
     "pymupdf4llm>=0.2.7; python_version < '3.14'",
