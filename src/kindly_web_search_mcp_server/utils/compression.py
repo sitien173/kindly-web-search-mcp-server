@@ -23,6 +23,7 @@ _model: str | None = os.environ.get("KINDLY_COMPRESS_MODEL", "").strip() or None
 _base_url: str | None = os.environ.get("KINDLY_COMPRESS_BASE_URL", "").strip() or None
 
 _warned_missing = False
+_warned_error = False
 _logged_backend = False
 
 
@@ -40,7 +41,7 @@ def _build_kwargs() -> dict:
 
 def maybe_compress(text: str) -> str:
     """Return *text* compressed if enabled and available, otherwise unchanged."""
-    global _warned_missing, _logged_backend
+    global _warned_missing, _warned_error, _logged_backend
 
     if not _enabled:
         return text
@@ -54,7 +55,13 @@ def maybe_compress(text: str) -> str:
             _warned_missing = True
         return text
 
-    result = _cc_compress(text, **_build_kwargs())
+    try:
+        result = _cc_compress(text, **_build_kwargs())
+    except Exception as exc:
+        if not _warned_error:
+            logger.warning("Caveman compression failed, returning uncompressed: %s", exc)
+            _warned_error = True
+        return text
 
     if isinstance(result, tuple):
         compressed = result[0]
