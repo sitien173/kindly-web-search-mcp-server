@@ -160,6 +160,19 @@ def main(argv: list[str] | None = None) -> None:
         for key, value in (("host", host), ("port", port)):
             if hasattr(mcp, "settings") and hasattr(mcp.settings, key):
                 setattr(mcp.settings, key, value)
+        # FastMCP auto-enables DNS rebinding protection when initialized with localhost
+        # (the default host). When host is overridden to a non-localhost value such as
+        # 0.0.0.0 for reverse-proxy deployments, the localhost-only allowlist rejects
+        # legitimate Host headers like the public domain, causing 421 responses.
+        _LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "::1"}
+        if host not in _LOCALHOST_HOSTS and hasattr(mcp, "settings") and hasattr(mcp.settings, "transport_security"):
+            try:
+                from mcp.server.transport_security import TransportSecuritySettings
+                mcp.settings.transport_security = TransportSecuritySettings(
+                    enable_dns_rebinding_protection=False
+                )
+            except ImportError:
+                pass
 
     try:
         mcp.run(transport=transport, mount_path=args.mount_path)
